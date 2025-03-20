@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter,status,HTTPException,Depends
 from ..schemas import ReviewCreateModel,ReviewResponseModel,ReviewEditModel,ReviewItemResponseModel
 from ..OAuth2 import get_current_user
@@ -10,38 +11,41 @@ router=APIRouter(prefix="/review",tags=['review'])
 @router.post("/addReview", status_code=status.HTTP_201_CREATED)
 async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
     try:
-        # Check if a movie exists with a review by the same user
-        existing_movie = await Review.find_one(
-            (Review.movie_name == review.movie_name) & 
-            (Review.reviews.created_by.id == user.id)
-        )
+        # Find if the movie already exists in the database
+        existing_movie = await Review.find_one(Review.movie_name == review.movie_name)
 
-        if existing_movie:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You have already submitted a review for this movie."
-            )
-
-        # Fetch the movie without checking for user review (we already checked above)
-        movie = await Review.find_one(Review.movie_name == review.movie_name)
-
+        # Create a new review object
         new_review = ReviewItem(
             review_content=review.review_content,
             rating=review.rating,
             created_by=user,  # Store user object
         )
 
-        if movie:
-            # Append the new review
-            movie.reviews.append(new_review)
+        if existing_movie:
+            # Check if the user has already reviewed this movie
+            user_review = next((r for r in existing_movie.reviews if r.created_by.id == user.id), None)
+            if user_review:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You have already submitted a review for this movie."
+                )
+
+            # Append the new review to the list
+            existing_movie.reviews.append(new_review)
 
             # Calculate and update overall rating
-            total_ratings = sum(r.rating for r in movie.reviews)
-            movie.overall_rating = total_ratings / len(movie.reviews)
+            total_ratings = sum(r.rating for r in existing_movie.reviews)
+            existing_movie.overall_rating = total_ratings / len(existing_movie.reviews)
 
-            # Save updated movie document
-            await movie.save()
-            overall_rating = movie.overall_rating
+            # Save the updated movie document
+            await existing_movie.save()
+
+            # Send the updated rating back
+            return {
+                "Success": "Review added successfully",
+                "overall_rating": round(existing_movie.overall_rating, 2)
+            }
+
         else:
             # If the movie doesn't exist, create a new entry
             new_movie = Review(
@@ -52,12 +56,12 @@ async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
             )
 
             await new_movie.insert()
-            overall_rating = new_movie.overall_rating
 
-        return {
-            "Success": "Review added successfully",
-            "overall_rating": round(overall_rating, 2)
-        }
+            # Send the initial rating back
+            return {
+                "Success": "Review added successfully",
+                "overall_rating": round(new_movie.overall_rating, 2)
+            }
 
     except Exception as e:
         error = f"Review adding failed: {str(e)}"
@@ -68,42 +72,38 @@ async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
 async def edit_review(movie_name: str, review_update: ReviewEditModel, user=Depends(get_current_user)):
     """Allow a user to edit their existing review for a movie."""
     try:
-        # Find the movie where the user has already submitted a review
-        existing_movie = await Review.find_one(
-            (Review.movie_name == movie_name) & 
-            (Review.reviews.created_by.id == user.id)
-        )
+        existing_movie = await Review.find_one(Review.movie_name == movie_name)
 
         if not existing_movie:
-            raise HTTPException(status_code=404, detail="Either the movie does not exist or you haven't reviewed it.")
+            raise HTTPException(status_code=404, detail="Movie not found.")
 
-        # Use Beanie's `update` method to modify the user's review directly
-        update_query = {
-            "reviews.$.review_content": review_update.review_content,
-            "reviews.$.rating": review_update.rating
-        }
-
-        updated_movie = await Review.find_one_and_update(
-            {"movie_name": movie_name, "reviews.created_by.id": user.id},
-            {"$set": update_query},
-            return_document=True
-        )
-
-        if not updated_movie:
-            raise HTTPException(status_code=500, detail="Failed to update the review.")
-
-        # Recalculate the overall rating
-        total_ratings = sum(rev.rating for rev in updated_movie.reviews)
-        updated_movie.overall_rating = round(total_ratings / len(updated_movie.reviews), 2)
-
-        # Save updated rating
-        await updated_movie.save()
+       # Find the user's review
+        for review in existing_movie.reviews:
+            if review.created_by.id == user.id:
+                review.review_content = review_update.review_content
+                review.rating = review_update.rating
+                break
+            else:
+                raise HTTPException(status_code=400, detail="You have not reviewed this movie.")
+            
+            
+        total_ratings = sum(rev.rating for rev in existing_movie.reviews)
+        existing_movie.overall_rating = round(total_ratings / len(existing_movie.reviews), 2)
+        await existing_movie.save()
 
         return {
             "movie_name": movie_name,
             "updated_review_content": review_update.review_content,
-            "overall_rating": updated_movie.overall_rating
+            "overall_rating": round(existing_movie.overall_rating, 2)
         }
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Review update failed: {str(e)}")
+
+
+        
 
     except HTTPException as e:
         raise e
@@ -112,49 +112,48 @@ async def edit_review(movie_name: str, review_update: ReviewEditModel, user=Depe
 
 
 
-
 @router.delete("/deleteReview/{movie_name}", status_code=status.HTTP_200_OK)
 async def delete_review(movie_name: str, user=Depends(get_current_user)):
     try:
-        # Find the movie with the user's review
         existing_movie = await Review.find_one(Review.movie_name == movie_name)
         if not existing_movie:
             raise HTTPException(status_code=404, detail="Movie not found")
 
-        # Use Beanie's filtering to directly locate the user's review
-        user_review = next((r for r in existing_movie.reviews if r.created_by.id == user.id), None)
+        # Find the user's review
+        user_review = None
+        for review in existing_movie.reviews:
+            if review.created_by.id == user.id:
+                user_review = review
+                break
 
         if not user_review:
-            raise HTTPException(status_code=404, detail="User has not reviewed this movie")
+            raise HTTPException(
+                status_code=404, detail="User has not reviewed this movie"
+            )
 
-        # Remove the review
-        updated_reviews = [r for r in existing_movie.reviews if r.created_by.id != user.id]
+        # Remove the user's review
+        existing_movie.reviews.remove(user_review)
 
-        if not updated_reviews:
-            # If no reviews left, delete the movie
+        # If no reviews left, delete the movie
+        if not existing_movie.reviews:
             await existing_movie.delete()
             return {"message": "Review and movie deleted successfully"}
 
-        # Update the movie with remaining reviews
-        total_ratings = sum(r.rating for r in updated_reviews)
-        overall_rating = round(total_ratings / len(updated_reviews), 2)
+        # Recalculate overall rating
+        total_ratings = sum(rev.rating for rev in existing_movie.reviews)
+        existing_movie.overall_rating = round(total_ratings / len(existing_movie.reviews), 2)
 
-        await existing_movie.set(
-            {"reviews": updated_reviews, "overall_rating": overall_rating}
-        )
-
+        await existing_movie.save()
         return {
             "message": "Review deleted successfully",
-            "overall_rating": overall_rating
+            "overall_rating": existing_movie.overall_rating
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete review: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete review: {str(e)}"
+        )
 
-
-
-
-  # Import the schema
 
 @router.get("/getReviews/{movie_name}", response_model=ReviewResponseModel, status_code=status.HTTP_200_OK)
 async def get_reviews(movie_name: str):
