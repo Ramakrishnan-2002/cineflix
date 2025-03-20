@@ -4,7 +4,7 @@ import requests
 import re
 import urllib.parse
 
-def fetch_movie_list(movie_name: str,response:Response):
+def fetch_movie_list(movie_name: str,response:Response): 
     """Fetch movie list from TMDB and return it."""
     url = f"https://www.themoviedb.org/search/movie?query={movie_name}&language=en-GB"
 

@@ -65,3 +65,11 @@ class MovieDetails(BaseModel):
     language: str
     watch_link: list
     backdrops: list
+
+
+class ForgotEmail(BaseModel):
+    email:EmailStr
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str

@@ -4,7 +4,7 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
 from .models import User, Review
-from .routers import user,reviews,auth,movies
+from .routers import user,reviews,auth,movies,mail
 from .config import settings
  # Encode password
 DATABASE_URL = settings.DATABASE_URL
@@ -34,3 +34,4 @@ app.include_router(user.router)
 app.include_router(auth.router)
 app.include_router(reviews.router)
 app.include_router(movies.router)
+app.include_router(mail.router)
