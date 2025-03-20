@@ -2,7 +2,7 @@ from typing import List
 from fastapi.responses import JSONResponse, ORJSONResponse
 import requests
 from fastapi import APIRouter, HTTPException, Response, Depends
-import yt_dlp 
+
 from ..scraper import fetch_movie_list, get_movie_details,fetch_trailer_url
 from ..schemas import MovieBasic, MovieDetails
 from ..OAuth2 import get_current_user

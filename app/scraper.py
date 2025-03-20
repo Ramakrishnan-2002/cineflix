@@ -159,6 +159,7 @@ async def fetch_trailer_url(movie_name: str):
         "format": "bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "timeout": 15,  # Reduced timeout
+        "cookies-from-browser": "chrome"
     }
 
     loop = asyncio.get_running_loop()
