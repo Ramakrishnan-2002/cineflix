@@ -1,8 +1,8 @@
-from datetime import datetime
 from fastapi import APIRouter,status,HTTPException,Depends
 from ..schemas import ReviewCreateModel,ReviewResponseModel,ReviewEditModel,ReviewItemResponseModel
 from ..OAuth2 import get_current_user
 from ..models import Review,ReviewItem
+from ..schemas import ReviewResponseModel
 
 
 router=APIRouter(prefix="/review",tags=['review'])
@@ -64,51 +64,48 @@ async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error)
 
 
-@router.put("/editReview/{movie_name}", status_code=status.HTTP_200_OK)
-async def edit_review(movie_name: str, review_update: ReviewEditModel, user=Depends(get_current_user)):
-    """Allow a user to edit their existing review for a movie."""
+@router.delete("/deleteReview/{movie_name}", status_code=status.HTTP_200_OK)
+async def delete_review(movie_name: str, user=Depends(get_current_user)):
+    """Allow a user to delete their existing review for a movie."""
     try:
-        # Find the movie where the user has already submitted a review
+        # Find the movie where the user has a review
         existing_movie = await Review.find_one(
-            (Review.movie_name == movie_name) & 
-            (Review.reviews.created_by.id == user.id)
+            (Review.movie_name == movie_name) & (Review.reviews.created_by.id == user.id)
         )
 
         if not existing_movie:
             raise HTTPException(status_code=404, detail="Either the movie does not exist or you haven't reviewed it.")
 
-        # Use Beanie's `update` method to modify the user's review directly
-        update_query = {
-            "reviews.$.review_content": review_update.review_content,
-            "reviews.$.rating": review_update.rating
-        }
-
+        # Use Beanie's `$pull` operator to remove the specific user's review
         updated_movie = await Review.find_one_and_update(
-            {"movie_name": movie_name, "reviews.created_by.id": user.id},
-            {"$set": update_query},
+            {"movie_name": movie_name},
+            {"$pull": {"reviews": {"created_by.id": user.id}}},
             return_document=True
         )
 
         if not updated_movie:
-            raise HTTPException(status_code=500, detail="Failed to update the review.")
+            raise HTTPException(status_code=500, detail="Failed to delete the review.")
+
+        # If no reviews left, delete the movie
+        if not updated_movie.reviews:
+            await updated_movie.delete()
+            return {"message": "Review and movie deleted successfully"}
 
         # Recalculate the overall rating
         total_ratings = sum(rev.rating for rev in updated_movie.reviews)
-        updated_movie.overall_rating = round(total_ratings / len(updated_movie.reviews), 2)
+        overall_rating = round(total_ratings / len(updated_movie.reviews), 2)
 
-        # Save updated rating
-        await updated_movie.save()
+        # Update the overall rating
+        await updated_movie.set({"overall_rating": overall_rating})
 
         return {
-            "movie_name": movie_name,
-            "updated_review_content": review_update.review_content,
-            "overall_rating": updated_movie.overall_rating
+            "message": "Review deleted successfully",
+            "overall_rating": overall_rating
         }
 
-    except HTTPException as e:
-        raise e
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Review update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete review: {str(e)}")
+
 
 @router.delete("/deleteReview/{movie_name}", status_code=status.HTTP_200_OK)
 async def delete_review(movie_name: str, user=Depends(get_current_user)):
@@ -151,8 +148,8 @@ async def delete_review(movie_name: str, user=Depends(get_current_user)):
         raise HTTPException(
             status_code=500, detail=f"Failed to delete review: {str(e)}"
         )
-from fastapi import Response
-from ..schemas import ReviewResponseModel  # Import the schema
+
+  # Import the schema
 
 @router.get("/getReviews/{movie_name}", response_model=ReviewResponseModel, status_code=status.HTTP_200_OK)
 async def get_reviews(movie_name: str):
