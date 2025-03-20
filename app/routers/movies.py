@@ -1,11 +1,13 @@
 from typing import List
 from fastapi.responses import JSONResponse, ORJSONResponse
+import httpx
 import requests
 from fastapi import APIRouter, HTTPException, Response, Depends
-
-from ..scraper import fetch_movie_list, get_movie_details,fetch_trailer_url
+from googleapiclient.discovery import build
+from ..scraper import fetch_movie_list, get_movie_details
 from ..schemas import MovieBasic, MovieDetails
 from ..OAuth2 import get_current_user
+from ..config import settings
 
 router = APIRouter(prefix="/movies", tags=["movies"])
 
@@ -50,11 +52,40 @@ def get_movie_full_details(movie_url: str, user=Depends(get_current_user)):
 
 
 
+
+
+async def get_trailer_from_youtube(movie_name: str):
+    """Fetch the first YouTube search result for the movie trailer using YouTube API asynchronously."""
+    search_query = f"{movie_name} official trailer"
+
+    params = {
+        "q": search_query,
+        "part": "snippet",
+        "maxResults": 1,
+        "type": "video",
+        "key": settings.YOUTUBE_API_KEY,  # Ensure this is valid
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(settings.YOUTUBE_API_URL, params=params)
+        
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="YouTube API request failed")
+
+        data = response.json()  # JSON conversion
+
+        if "items" in data and data["items"]:
+            video_id = data["items"][0]["id"]["videoId"]
+            return f"https://www.youtube.com/watch?v={video_id}"
+
+    return None
+
 @router.get("/trailer/{movie_name}")
 async def get_movie_trailer(movie_name: str, user=Depends(get_current_user)):
-    """Get the movie trailer asynchronously."""
-    trailer_url = await fetch_trailer_url(movie_name)
+    """Fetch the movie trailer URL using YouTube API."""
+    trailer_url = await get_trailer_from_youtube(movie_name)
 
-    if "http" in trailer_url:
+    if trailer_url:
         return {"movie_name": movie_name, "trailer_url": trailer_url}
-    raise HTTPException(status_code=404, detail=trailer_url)
+    
+    raise HTTPException(status_code=404, detail="Trailer not found.")

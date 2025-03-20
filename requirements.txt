@@ -5,6 +5,7 @@ bcrypt==4.0.1
 beanie==1.29.0
 beautifulsoup4==4.13.3
 blinker==1.9.0
+cachetools==5.5.2
 certifi==2025.1.31
 cffi==1.17.1
 charset-normalizer==3.4.1
@@ -17,8 +18,14 @@ email_validator==2.2.0
 fastapi==0.115.11
 fastapi-cli==0.0.7
 fastapi-mail==1.4.2
+google-api-core==2.24.2
+google-api-python-client==2.165.0
+google-auth==2.38.0
+google-auth-httplib2==0.2.0
+googleapis-common-protos==1.69.2
 h11==0.14.0
 httpcore==1.0.7
+httplib2==0.22.0
 httptools==0.6.4
 httpx==0.28.1
 idna==3.10
@@ -31,7 +38,10 @@ mdurl==0.1.2
 motor==3.7.0
 orjson==3.10.15
 passlib==1.7.4
+proto-plus==1.26.1
+protobuf==6.30.1
 pyasn1==0.4.8
+pyasn1_modules==0.4.1
 pycparser==2.22
 pydantic==2.10.6
 pydantic-extra-types==2.10.3
@@ -39,6 +49,7 @@ pydantic-settings==2.8.1
 pydantic_core==2.27.2
 Pygments==2.19.1
 pymongo==4.11.3
+pyparsing==3.2.1
 python-dotenv==1.0.1
 python-jose==3.4.0
 python-multipart==0.0.20
@@ -56,6 +67,7 @@ toml==0.10.2
 typer==0.15.2
 typing_extensions==4.12.2
 ujson==5.10.0
+uritemplate==4.1.1
 urllib3==2.3.0
 uvicorn==0.34.0
 watchfiles==1.0.4
