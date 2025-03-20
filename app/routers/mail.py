@@ -25,7 +25,7 @@ async def send_reset_email(
     try:
         # Generate a reset token valid for 1 hour
         token = serializer.dumps(user.email, salt="password-reset-salt")
-        reset_url = f"http://localhost:8000/reset-password?token={token}"
+        reset_url = f"https://cineflix-production.up.railway.app/reset-password?token={token}"
         html = f"""
         <p>Hello {user.name},</p>
         <p>Click the link below to reset your password:</p>
