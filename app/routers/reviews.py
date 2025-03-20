@@ -64,39 +64,84 @@ async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error)
 
 
-@router.delete("/deleteReview/{movie_name}", status_code=status.HTTP_200_OK)
-async def delete_review(movie_name: str, user=Depends(get_current_user)):
-    """Allow a user to delete their existing review for a movie."""
+@router.put("/editReview/{movie_name}", status_code=status.HTTP_200_OK)
+async def edit_review(movie_name: str, review_update: ReviewEditModel, user=Depends(get_current_user)):
+    """Allow a user to edit their existing review for a movie."""
     try:
-        # Find the movie where the user has a review
+        # Find the movie where the user has already submitted a review
         existing_movie = await Review.find_one(
-            (Review.movie_name == movie_name) & (Review.reviews.created_by.id == user.id)
+            (Review.movie_name == movie_name) & 
+            (Review.reviews.created_by.id == user.id)
         )
 
         if not existing_movie:
             raise HTTPException(status_code=404, detail="Either the movie does not exist or you haven't reviewed it.")
 
-        # Use Beanie's `$pull` operator to remove the specific user's review
+        # Use Beanie's `update` method to modify the user's review directly
+        update_query = {
+            "reviews.$.review_content": review_update.review_content,
+            "reviews.$.rating": review_update.rating
+        }
+
         updated_movie = await Review.find_one_and_update(
-            {"movie_name": movie_name},
-            {"$pull": {"reviews": {"created_by.id": user.id}}},
+            {"movie_name": movie_name, "reviews.created_by.id": user.id},
+            {"$set": update_query},
             return_document=True
         )
 
         if not updated_movie:
-            raise HTTPException(status_code=500, detail="Failed to delete the review.")
-
-        # If no reviews left, delete the movie
-        if not updated_movie.reviews:
-            await updated_movie.delete()
-            return {"message": "Review and movie deleted successfully"}
+            raise HTTPException(status_code=500, detail="Failed to update the review.")
 
         # Recalculate the overall rating
         total_ratings = sum(rev.rating for rev in updated_movie.reviews)
-        overall_rating = round(total_ratings / len(updated_movie.reviews), 2)
+        updated_movie.overall_rating = round(total_ratings / len(updated_movie.reviews), 2)
 
-        # Update the overall rating
-        await updated_movie.set({"overall_rating": overall_rating})
+        # Save updated rating
+        await updated_movie.save()
+
+        return {
+            "movie_name": movie_name,
+            "updated_review_content": review_update.review_content,
+            "overall_rating": updated_movie.overall_rating
+        }
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Review update failed: {str(e)}")
+
+
+
+
+@router.delete("/deleteReview/{movie_name}", status_code=status.HTTP_200_OK)
+async def delete_review(movie_name: str, user=Depends(get_current_user)):
+    try:
+        # Find the movie with the user's review
+        existing_movie = await Review.find_one(Review.movie_name == movie_name)
+        if not existing_movie:
+            raise HTTPException(status_code=404, detail="Movie not found")
+
+        # Use Beanie's filtering to directly locate the user's review
+        user_review = next((r for r in existing_movie.reviews if r.created_by.id == user.id), None)
+
+        if not user_review:
+            raise HTTPException(status_code=404, detail="User has not reviewed this movie")
+
+        # Remove the review
+        updated_reviews = [r for r in existing_movie.reviews if r.created_by.id != user.id]
+
+        if not updated_reviews:
+            # If no reviews left, delete the movie
+            await existing_movie.delete()
+            return {"message": "Review and movie deleted successfully"}
+
+        # Update the movie with remaining reviews
+        total_ratings = sum(r.rating for r in updated_reviews)
+        overall_rating = round(total_ratings / len(updated_reviews), 2)
+
+        await existing_movie.set(
+            {"reviews": updated_reviews, "overall_rating": overall_rating}
+        )
 
         return {
             "message": "Review deleted successfully",
@@ -107,47 +152,7 @@ async def delete_review(movie_name: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"Failed to delete review: {str(e)}")
 
 
-@router.delete("/deleteReview/{movie_name}", status_code=status.HTTP_200_OK)
-async def delete_review(movie_name: str, user=Depends(get_current_user)):
-    try:
-        existing_movie = await Review.find_one(Review.movie_name == movie_name)
-        if not existing_movie:
-            raise HTTPException(status_code=404, detail="Movie not found")
 
-        # Find the user's review
-        user_review = None
-        for review in existing_movie.reviews:
-            if review.created_by.id == user.id:
-                user_review = review
-                break
-
-        if not user_review:
-            raise HTTPException(
-                status_code=404, detail="User has not reviewed this movie"
-            )
-
-        # Remove the user's review
-        existing_movie.reviews.remove(user_review)
-
-        # If no reviews left, delete the movie
-        if not existing_movie.reviews:
-            await existing_movie.delete()
-            return {"message": "Review and movie deleted successfully"}
-
-        # Recalculate overall rating
-        total_ratings = sum(rev.rating for rev in existing_movie.reviews)
-        existing_movie.overall_rating = round(total_ratings / len(existing_movie.reviews), 2)
-
-        await existing_movie.save()
-        return {
-            "message": "Review deleted successfully",
-            "overall_rating": existing_movie.overall_rating
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to delete review: {str(e)}"
-        )
 
   # Import the schema
 
