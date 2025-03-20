@@ -11,6 +11,12 @@ router=APIRouter(prefix="/review",tags=['review'])
 async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
     try:
         existing_movie = await Review.find_one(Review.movie_name == review.movie_name)
+        new_review = ReviewItem(
+                review_content=review.review_content,
+                rating=review.rating,
+                created_by=user,  # Store user ID instead of user object
+                
+            )
         
         if existing_movie:
             # Check if the user has already reviewed this movie
@@ -22,12 +28,7 @@ async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
                 )
 
             # Create a new review
-            new_review = ReviewItem(
-                review_content=review.review_content,
-                rating=review.rating,
-                created_by=user,  # Store user ID instead of user object
-                
-            )
+           
 
             # Append to existing reviews
             existing_movie.reviews.append(new_review)
@@ -35,16 +36,11 @@ async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
 
             # Calculate new overall rating
             total_ratings = sum(r.rating for r in existing_movie.reviews)
-            overall_rating = total_ratings / len(existing_movie.reviews)
+            existing_movie.overall_rating = total_ratings / len(existing_movie.reviews)
 
         else:
             # If movie doesn't exist, create a new movie entry with the review
-            new_review = ReviewItem(
-                review_content=review.review_content,
-                rating=review.rating,
-                created_by=user,
-               
-            )
+            
 
             new_movie = Review(
                 movie_name=review.movie_name,
@@ -52,9 +48,9 @@ async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
                 overall_rating=review.rating,
                 reviews=[new_review],  # Store as a list of valid review objects
             )
-
+            
             await new_movie.insert()
-            overall_rating = review.rating  # Since it's the first review
+             # Since it's the first review
 
         return {
             "Success": "Review added successfully",
