@@ -27,3 +27,4 @@ class Review(Document):
     class Settings:
         collection = "reviews"
 
+ 

@@ -1,8 +1,11 @@
+import asyncio
 from bs4 import BeautifulSoup
 from fastapi import HTTPException,Response
 import requests
 import re
 import urllib.parse
+
+import yt_dlp
 
 def fetch_movie_list(movie_name: str,response:Response): 
     """Fetch movie list from TMDB and return it."""
@@ -143,3 +146,29 @@ def fetch_watch_links(streaming_url):
         print(f"Error fetching watch links: {e}")
         return {"error": "Failed to fetch watch links"}
 
+
+
+async def fetch_trailer_url(movie_name: str):
+    """Fetch trailer URL asynchronously."""
+    search_query = f"{movie_name} official trailer"
+
+    ydl_opts = {
+        "quiet": True,
+        "default_search": "ytsearch1",
+        "noplaylist": True,
+        "format": "bestvideo+bestaudio/best",
+        "merge_output_format": "mp4",
+        "timeout": 15,  # Reduced timeout
+    }
+
+    loop = asyncio.get_running_loop()
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = await loop.run_in_executor(None, ydl.extract_info, search_query, False)
+
+            if "entries" in info and info["entries"]:
+                return info["entries"][0].get("webpage_url", "Trailer not found.")
+
+    except Exception as e:
+        return f"Error fetching trailer: {str(e)}"

@@ -121,7 +121,7 @@ async def delete_review(movie_name: str, user=Depends(get_current_user)):
 
         # Find the user's review
         user_review = None
-        for review in existing_movie.reviews:
+        for review in existing_movie.reviews: 
             if review.created_by.id == user.id:
                 user_review = review
                 break
