@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status,  BackgroundTasks
+from fastapi.responses import RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from ..schemas import ForgotEmail, ResetPassword
 from ..mailer import mail, create_message
@@ -71,3 +72,9 @@ async def reset_password(data: ResetPassword):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token.")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to reset password: {e}")
+    
+@router.get("/logout")
+async def redirect_to_login():
+    redirect_response=RedirectResponse(url="/",status_code=status.HTTP_302_FOUND)
+    redirect_response.delete_cookie(key="access_token")
+    return redirect_response
