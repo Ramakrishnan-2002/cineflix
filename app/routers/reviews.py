@@ -137,7 +137,7 @@ async def delete_review(movie_name: str, user=Depends(get_current_user)):
         # If no reviews left, delete the movie
         if not existing_movie.reviews:
             await existing_movie.delete()
-            return {"message": "Review and movie deleted successfully"}
+            return {"message": "Review and movie deleted successfully","overall_rating":"0"}
 
         # Recalculate overall rating
         total_ratings = sum(rev.rating for rev in existing_movie.reviews)
