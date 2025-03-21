@@ -2,8 +2,7 @@ from typing import List
 from fastapi.responses import JSONResponse, ORJSONResponse
 import httpx
 import requests
-from fastapi import APIRouter, HTTPException, Response, Depends
-from googleapiclient.discovery import build
+from fastapi import APIRouter, HTTPException, Response, Depends,status
 from ..scraper import fetch_movie_list, get_movie_details
 from ..schemas import MovieBasic, MovieDetails
 from ..OAuth2 import get_current_user
@@ -17,8 +16,7 @@ def search_movies(movie_name: str, response: Response, user=Depends(get_current_
     """Fetch and return movie list synchronously."""
     movies = fetch_movie_list(movie_name, response)
     if not movies:
-        response.status_code = 404
-        return ORJSONResponse({"detail": f"No movies found for '{movie_name}'"})
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail= f"No movies found for '{movie_name}'")
 
     return ORJSONResponse(movies)
 
@@ -28,26 +26,21 @@ def get_movie_full_details(movie_url: str, user=Depends(get_current_user)):
     """Fetch and return detailed movie data synchronously with JSON error handling."""
     
     if not movie_url.startswith("https://www.themoviedb.org/movie/"):
-        return JSONResponse(content={"error": "Invalid movie URL"}, status_code=400)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid movie URL")
 
     try:
         details = get_movie_details(movie_url)
         movies = MovieDetails(**details)
-
         return ORJSONResponse(content=movies.model_dump(), status_code=200)
 
-    except HTTPException as e:
-        return JSONResponse(content={"error": e.detail}, status_code=e.status_code)
-
     except requests.Timeout:
-        return JSONResponse(content={"error": "Request to TMDB timed out"}, status_code=504)
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="Request to TMDB timed out")
 
     except requests.RequestException as e:
-        return JSONResponse(content={"error": "Error fetching movie details", "details": str(e)}, status_code=502)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Error fetching movie details: {str(e)}")
 
     except Exception as e:
-        return JSONResponse(content={"error": "Internal Server Error", "details": str(e)}, status_code=500)
-
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal Server Error: {str(e)}")
 
 
 
