@@ -156,7 +156,7 @@ async def delete_review(movie_name: str, user=Depends(get_current_user)):
 
 
 @router.get("/getReviews/{movie_name}", response_model=ReviewResponseModel, status_code=status.HTTP_200_OK)
-async def get_reviews(movie_name: str):
+async def get_reviews(movie_name: str,user=Depends(get_current_user)):
     try:
         existing_movie = await Review.find_one(Review.movie_name == movie_name)
         if not existing_movie:
