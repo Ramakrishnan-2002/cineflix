@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 from fastapi import HTTPException,Response
+import httpx
 import requests
 import re
 import urllib.parse
@@ -146,4 +147,33 @@ def fetch_watch_links(streaming_url):
         return {"error": "Failed to fetch watch links"}
 
 
+async def fetch_movies_from_page(client, page, base_url):
+    """Fetch movies from a single page asynchronously, with exception handling."""
+    url = f"{base_url}?page={page}&language=en"
+    
+    try:
+        response = await client.get(url, timeout=10)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=f"Error fetching page {page}: {e}")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail=f"Request error: {e}")
+    
+    soup = BeautifulSoup(response.text, "html.parser")
 
+    movies = []
+    for card in soup.select("div.card.style_1"):
+        title = card.select_one("h2").get_text(strip=True) if card.select_one("h2") else "Unknown"
+        release_date = card.select_one("div.content p").text if card.select_one("div.content p") else "Unknown"
+        poster = card.select_one("img")["src"] if card.select_one("img") else "No poster available"
+        movie_link = card.select_one("a")["href"] if card.select_one("a") else None
+        movie_url = f"https://www.themoviedb.org{movie_link}" if movie_link else "No URL available"
+
+        movies.append({
+            "title": title,
+            "release_date": release_date,
+            "poster": poster,
+            "url": movie_url
+        })
+
+    return movies

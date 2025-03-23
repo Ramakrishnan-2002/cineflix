@@ -1,9 +1,10 @@
+import asyncio
 from typing import List
-from fastapi.responses import JSONResponse, ORJSONResponse
+from fastapi.responses import  ORJSONResponse
 import httpx
 import requests
 from fastapi import APIRouter, HTTPException, Response, Depends,status
-from ..scraper import fetch_movie_list, get_movie_details
+from ..scraper import fetch_movie_list, get_movie_details,fetch_movies_from_page
 from ..schemas import MovieBasic, MovieDetails
 from ..OAuth2 import get_current_user
 from ..config import settings
@@ -82,3 +83,43 @@ async def get_movie_trailer(movie_name: str, user=Depends(get_current_user)):
         return {"movie_name": movie_name, "trailer_url": trailer_url}
     
     raise HTTPException(status_code=404, detail="Trailer not found.")
+
+
+POPULAR_URL = "https://www.themoviedb.org/movie"
+TOP_RATED_URL = "https://www.themoviedb.org/movie/top-rated"
+UPCOMING_URL = "https://www.themoviedb.org/movie/upcoming"
+MAX_PAGES = 10 
+
+async def fetch_all_movies_by_category(base_url):
+    """Fetch all movies for a specific category asynchronously."""
+    try:
+        async with httpx.AsyncClient() as client:
+            tasks = [fetch_movies_from_page(client, page, base_url) for page in range(1, MAX_PAGES + 1)]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        all_movies = []
+        for result in results:
+            if isinstance(result, Exception):
+                print(f"Skipping failed request: {result}")  # Log the error but continue
+                continue
+            all_movies.extend(result)
+
+        if not all_movies:
+            raise HTTPException(status_code=404, detail="No movies found")
+
+        return {"movies": all_movies}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+
+@router.get("/popular")
+async def fetch_popular_movies(user=Depends(get_current_user)):
+    return await fetch_all_movies_by_category(POPULAR_URL)
+
+@router.get("/top-rated")
+async def fetch_top_rated_movies(user=Depends(get_current_user)):
+    return await fetch_all_movies_by_category(TOP_RATED_URL)
+
+@router.get("/upcoming")
+async def fetch_upcoming_movies(user=Depends(get_current_user)):
+    return await fetch_all_movies_by_category(UPCOMING_URL)
