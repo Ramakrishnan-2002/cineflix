@@ -155,10 +155,10 @@ async def delete_review(movie_name: str, user=Depends(get_current_user)):
         )
 
 
-@router.get("/getReviews/{movie_name}", response_model=ReviewResponseModel, status_code=status.HTTP_200_OK)
-async def get_reviews(movie_name: str,user=Depends(get_current_user)):
+@router.get("/getReviews/{movie_name}/{release_date}", response_model=ReviewResponseModel, status_code=status.HTTP_200_OK)
+async def get_reviews(movie_name: str,release_date:str,user=Depends(get_current_user)):
     try:
-        existing_movie = await Review.find_one(Review.movie_name == movie_name)
+        existing_movie = await Review.find_one(Review.movie_name == movie_name, Review.release_date==release_date)
         if not existing_movie:
             raise HTTPException(status_code=404, detail="Movie not found")
 
