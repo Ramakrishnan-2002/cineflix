@@ -68,11 +68,11 @@ async def add_review(review: ReviewCreateModel, user=Depends(get_current_user)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error)
 
 
-@router.put("/editReview/{movie_name}", status_code=status.HTTP_200_OK)
-async def edit_review(movie_name: str, review_update: ReviewEditModel, user=Depends(get_current_user)):
+@router.put("/editReview/{movie_name}/{release_date}", status_code=status.HTTP_200_OK)
+async def edit_review(movie_name: str,release_date:str, review_update: ReviewEditModel, user=Depends(get_current_user)):
     """Allow a user to edit their existing review for a movie."""
     try:
-        existing_movie = await Review.find_one(Review.movie_name == movie_name)
+        existing_movie = await Review.find_one(Review.movie_name == movie_name,Review.release_date==release_date)
 
         if not existing_movie:
             raise HTTPException(status_code=404, detail="Movie not found.")
@@ -112,10 +112,10 @@ async def edit_review(movie_name: str, review_update: ReviewEditModel, user=Depe
 
 
 
-@router.delete("/deleteReview/{movie_name}", status_code=status.HTTP_200_OK)
-async def delete_review(movie_name: str, user=Depends(get_current_user)):
+@router.delete("/deleteReview/{movie_name}/{release_date}", status_code=status.HTTP_200_OK)
+async def delete_review(movie_name: str,release_date:str, user=Depends(get_current_user)):
     try:
-        existing_movie = await Review.find_one(Review.movie_name == movie_name)
+        existing_movie = await Review.find_one(Review.movie_name == movie_name,Review.release_date==release_date)
         if not existing_movie:
             raise HTTPException(status_code=404, detail="Movie not found")
 
