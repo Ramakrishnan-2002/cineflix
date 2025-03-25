@@ -89,6 +89,8 @@ def get_movie_details(movie_url):
     watch_links = fetch_watch_links(streaming_url) if watch_link_element else ["No watch links available"]
 
     backdrops = fetch_backdrop_images(movie_url)
+    overview_element = soup.select_one('div.overview p')
+    overview = overview_element.get_text(strip=True) if overview_element else "No overview available"
 
     return {
         "director": director,
@@ -98,7 +100,8 @@ def get_movie_details(movie_url):
         "certificate": certificate,
         "language": language,
         "watch_link": watch_links,
-        "backdrops": backdrops
+        "backdrops": backdrops,
+        "overview": overview 
     }
 
 

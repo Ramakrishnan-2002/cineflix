@@ -65,6 +65,7 @@ class MovieDetails(BaseModel):
     language: str
     watch_link: list
     backdrops: list
+    overview :str
 
 
 class ForgotEmail(BaseModel):
