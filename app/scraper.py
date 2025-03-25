@@ -149,7 +149,7 @@ def fetch_watch_links(streaming_url):
 
 async def fetch_movies_from_page(client, page, base_url):
     """Fetch movies from a single page asynchronously, with exception handling."""
-    url = f"{base_url}?page={page}&language=en"
+    url = f"{base_url}?page={page}&language=en-GB"
     
     try:
         response = await client.get(url, timeout=10)
