@@ -38,7 +38,7 @@ class ReviewEditModel(BaseModel):
 class ReviewItemResponseModel(BaseModel):
     review_content: str
     rating: int
-    created_by: PydanticObjectId  # User ID reference
+    created_by: UserResponseModel    # User ID reference
     created_at: datetime
 
 class ReviewResponseModel(BaseModel):

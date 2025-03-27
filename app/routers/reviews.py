@@ -1,8 +1,8 @@
 
 from fastapi import APIRouter,status,HTTPException,Depends
-from ..schemas import ReviewCreateModel,ReviewResponseModel,ReviewEditModel,ReviewItemResponseModel
+from ..schemas import ReviewCreateModel,ReviewResponseModel,ReviewEditModel,ReviewItemResponseModel, UserResponseModel
 from ..OAuth2 import get_current_user
-from ..models import Review,ReviewItem
+from ..models import Review,ReviewItem, User
 from ..schemas import ReviewResponseModel
 
 
@@ -167,19 +167,31 @@ async def get_reviews(movie_name: str,release_date:str,user=Depends(get_current_
             if existing_movie.reviews else 0
         )
 
+        reviews_with_users = []
+        for rev in existing_movie.reviews:
+            user_data = await User.find_one(User.id == rev.created_by.id)  # Fetch full user details
+            if not user_data:
+                raise HTTPException(status_code=404, detail=f"User not found for review {rev.id}")
+
+            reviews_with_users.append(
+                ReviewItemResponseModel(
+                    review_content=rev.review_content,
+                    rating=rev.rating,
+                    created_by=UserResponseModel(  # Embed full user details
+                        id=user_data.id,
+                        name=user_data.name,
+                        email=user_data.email,
+                        created_at=user_data.created_at
+                    ),
+                    created_at=rev.created_at
+                )
+            )
+
         return ReviewResponseModel(
             movie_name=existing_movie.movie_name,
             release_date=existing_movie.release_date,
             overall_rating=overall_rating,
-            reviews=[
-                ReviewItemResponseModel(
-                    review_content=rev.review_content,
-                    rating=rev.rating,
-                    created_by=rev.created_by.id,
-                    created_at=rev.created_at
-                )
-                for rev in existing_movie.reviews
-            ],
+            reviews=reviews_with_users
         )
 
     except Exception as e:
