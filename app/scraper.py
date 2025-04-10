@@ -24,7 +24,7 @@ def fetch_movie_list(movie_name: str,response:Response):
 
     for card in soup.select('div.card.v4.tight'):
         movie_link = card.select_one('a.result')
-        if not movie_link or "https://www.themoviedb.org/tv" in movie_link:
+        if not movie_link:
             continue
 
         movie_url = f"https://www.themoviedb.org{movie_link['href']}"
