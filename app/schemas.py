@@ -37,7 +37,7 @@ class ReviewEditModel(BaseModel):
 
 class ReviewItemResponseModel(BaseModel):
     review_content: str
-    rating: int
+    rating: float
     created_by: UserResponseModel    # User ID reference
     created_at: datetime
 

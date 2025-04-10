@@ -26,8 +26,14 @@ def fetch_movie_list(movie_name: str,response:Response):
         movie_link = card.select_one('a.result')
         if not movie_link:
             continue
+        href = movie_link['href']
+        
+        # Skip TV shows
+        if href.startswith("/tv/"):
+            continue
 
-        movie_url = f"https://www.themoviedb.org{movie_link['href']}"
+
+        movie_url = f"https://www.themoviedb.org{href}"
 
         movies.append({
             "title": card.select_one('h2').get_text(strip=True) if card.select_one('h2') else "Unknown",
