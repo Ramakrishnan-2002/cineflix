@@ -131,7 +131,7 @@ async def delete_review(movie_name: str,release_date:str, user=Depends(get_curre
             )
 
         existing_movie.reviews.remove(user_review)
-e
+
         if not existing_movie.reviews:
             await existing_movie.delete()
             return {"message": "Review and movie deleted successfully","overall_rating":"0"}
